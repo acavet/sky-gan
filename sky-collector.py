@@ -4,11 +4,12 @@ import praw
 import os
 import urllib
 from PIL import Image
+from io import BytesIO
 import config
 
 imgs_path = '/Volumes/skyflash/'  # flashdrive to store downloaded pics on
 allowed_extensions = ['.jpg', '.jpeg']
-
+img_size = 64  # dimension of processed square image
 
 reddit = praw.Reddit(client_id=config.client_id,
                      client_secret=config.client_secret,
@@ -21,13 +22,13 @@ img_urls = [post.url for post in posts]
 downloaded_idx = 0  # to keep track of number valid downloaded imgs/add to img names
 
 
-def process_img(img_path):
-    # crops downloaded img to square, reduces size to 256x256 pxls
-    im = Image.open(img_path)
+def process_img(img, img_path):
+    # crops downloaded img to square, reduces size
+    im = Image.open(img)
     w, h = im.size
     sq_len = min(w, h)
     sq_im = im.crop((0, 0, sq_len, sq_len))
-    sq_small_im = sq_im.resize((256, 256))
+    sq_small_im = sq_im.resize((img_size, img_size))
     sq_small_im.save(img_path)
 
 
@@ -40,9 +41,8 @@ for index, url in enumerate(img_urls):
                 str(downloaded_idx) + ext
             print('downloading:', img_urls[index],
                   'at', download_path)
-            urllib.request.urlretrieve(
-                img_urls[index], download_path)
-            process_img(download_path)
+            img = BytesIO(urllib.request.urlopen(img_urls[index]).read())
+            process_img(img, download_path)
             downloaded_idx += 1
         except urllib.error.URLError as e:
             print('something went wrong while downloading:\n',
