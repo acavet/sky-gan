@@ -7,16 +7,17 @@ from PIL import Image
 from io import BytesIO
 import config
 
-imgs_path = '/Volumes/skyflash/'  # flashdrive to store downloaded pics on
+# flashdrive to store downloaded pics on
+imgs_path = '/Volumes/SKYFLASH/fromReddit/sky/'
 allowed_extensions = ['.jpg', '.jpeg']
-img_size = 64  # dimension of processed square image
+img_size = 32  # dimension of processed square image
 
 reddit = praw.Reddit(client_id=config.client_id,
                      client_secret=config.client_secret,
                      user_agent='sky-collector')
 
 subreddit = reddit.subreddit('SkyPorn')
-posts = subreddit.hot(limit=5)
+posts = subreddit.hot(limit=1000)
 img_urls = [post.url for post in posts]
 
 downloaded_idx = 0  # to keep track of number valid downloaded imgs/add to img names
