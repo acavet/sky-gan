@@ -156,6 +156,40 @@ def build_network(d_conv_dim, g_conv_dim, z_size):
     return D, G
 
 
+def real_loss(D_out, train_on_gpu, smooth=False):
+
+    batch_size = D_out.size(0)
+
+    # label smoothing
+    if smooth:
+        # smooth, real labels = 0.9
+        labels = torch.ones(batch_size)*0.9
+    else:
+        labels = torch.ones(batch_size)  # real labels = 1
+    # move labels to GPU if available
+    if train_on_gpu:
+        labels = labels.cuda()
+    # binary cross entropy with logits loss
+    criterion = nn.BCEWithLogitsLoss()
+
+    # print(D_out.squeeze().shape)
+    # print(labels.shape)
+    # calculate loss
+    loss = criterion(D_out.squeeze(), labels)
+    return loss
+
+
+def fake_loss(D_out, train_on_gpu):
+    batch_size = D_out.size(0)
+    labels = torch.zeros(batch_size)  # fake labels = 0
+    if train_on_gpu:
+        labels = labels.cuda()
+    criterion = nn.BCEWithLogitsLoss()
+    # calculate loss
+    loss = criterion(D_out.squeeze(), labels)
+    return loss
+
+
 def train(D, G, z_size, train_loader, epochs, d_optimizer, g_optimizer, train_on_gpu):
     """
     This is the training method that is called by the PyTorch training script. The parameters
@@ -351,10 +385,7 @@ if __name__ == '__main__':
     G = train(D, G, args.z_size, train_loader, args.epochs,
               d_optimizer, g_optimizer, device)
 
-    # # save model parameters
-    # G_path = os.path.join(models_path, 'generator_model.pt')
-    # with open(G_path, 'wb') as f:
-    #     torch.save(G.cpu().state_dict(), f)
+    # Save the model parameters
     G_path = os.path.join(args.model_dir, 'generator_model_main.pt')
     with open(G_path, 'wb') as f:
         torch.save(G.cpu().state_dict(), f)
