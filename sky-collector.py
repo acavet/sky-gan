@@ -68,7 +68,7 @@ def process_img(img, img_path):
     sq_small_im.save(img_path)
 
 
-num_errs = 0
+n_errs = 0
 
 # Download and process jpg/jpeg imgs
 for index, url in enumerate(final_img_links):
@@ -83,6 +83,6 @@ for index, url in enumerate(final_img_links):
     except urllib.error.URLError as e:
         print('Something went wrong while downloading:\n',
               final_img_links[index], e)
-        num_errs += 1
+        n_errs += 1
 
-print(f'{num_errs} images could not be downloaded, {n_imgs-n_errs} images successfully downloaded and processed.')
+print(f'{n_errs} images could not be downloaded, {n_imgs-n_errs} images successfully downloaded and processed.')
