@@ -1,30 +1,65 @@
-'''Scrapes images from r/SkyPorn using Reddit API, formats for GAN training'''
+'''Scrapes n images from given subreddit using Reddit API, formats for GAN training. 
+Not limited by usual 1k image cap.'''
 
-import praw
+# import praw
 import os
 import urllib
 from PIL import Image
 from io import BytesIO
 import config
+import datetime
+import requests
+import pandas as pd
+import json
+import csv
+import time
+import math
 
-# flashdrive to store downloaded pics on
-imgs_path = '/Volumes/SKYFLASH/fromReddit/sky/'
+imgs_path = '/Volumes/SKYFLASH/fromReddit/sky/'  # Where to save imgs
+subreddit = 'SkyPorn'
+n_imgs = 100  # Number images to retrieve
 allowed_extensions = ['.jpg', '.jpeg']
-img_size = 32  # dimension of processed square image
+img_size = 32  # Pxl dimension of processed square image
 
-reddit = praw.Reddit(client_id=config.client_id,
-                     client_secret=config.client_secret,
-                     user_agent='sky-collector')
 
-subreddit = reddit.subreddit('SkyPorn')
-posts = subreddit.hot(limit=1000)
-img_urls = [post.url for post in posts]
+def add_pushshift_100(before, subreddit, allowed_extensions, n_to_get):
+    '''Get 100 image links from before certain timestamp with correct extensions
+    Return: image links, earliest retrieved post timestamp (for next round)'''
+    print(
+        f'Getting up to {n_to_get} more image links with the right extensions...')
+    url = f'https://api.pushshift.io/reddit/search/submission/?size={ n_to_get }&before={ str(before) }+&subreddit={ str(subreddit) }'
+    print(url)
+    data = requests.get(url).json()['data']
+    # Get img links with right extensions
+    img_links = [post['url_overridden_by_dest'] for post in data
+                 if os.path.splitext(post['url_overridden_by_dest'])[-1] in allowed_extensions]
+    return {'img_list': img_links, 'curr_unix': data[-1]['created_utc']}
 
-downloaded_idx = 0  # to keep track of number valid downloaded imgs/add to img names
+
+def get_n_pics(n, subreddit, allowed_extensions=['.jpg', '.jpeg']):
+    '''Retrieve n image links from a subreddit (most recent, with specified extensions'''
+    n_left = n
+    curr_unix = math.floor(time.time())
+    img_list = []
+    while n_left > 0:
+        n_to_get = 100 if n_left > 100 else n_left
+        results = add_pushshift_100(
+            curr_unix, subreddit, allowed_extensions, n_to_get)
+        curr_unix = results['curr_unix']
+        img_list = img_list + results['img_list']
+        n_left = n_left-len(results['img_list'])
+        print(
+            f'\n\n Need {n_left} more images, currently have {len(img_list)} image links: {img_list}')
+    print(f'\n\nRetrieved {len(img_list)} images!')
+    return img_list
+
+
+# List of all sky img links
+final_img_links = get_n_pics(n_imgs, subreddit, ['.jpg', '.jpeg'])
 
 
 def process_img(img, img_path):
-    # crops downloaded img to square, reduces size
+    '''Crops downloaded img to square, reduces size'''
     im = Image.open(img)
     w, h = im.size
     sq_len = min(w, h)
@@ -33,18 +68,21 @@ def process_img(img, img_path):
     sq_small_im.save(img_path)
 
 
-# download and process jpg/jpeg imgs
-for index, url in enumerate(img_urls):
+num_errs = 0
+
+# Download and process jpg/jpeg imgs
+for index, url in enumerate(final_img_links):
     _, ext = os.path.splitext(url)
-    if ext in allowed_extensions:
-        try:
-            download_path = imgs_path + \
-                str(downloaded_idx) + ext
-            print('downloading:', img_urls[index],
-                  'at', download_path)
-            img = BytesIO(urllib.request.urlopen(img_urls[index]).read())
-            process_img(img, download_path)
-            downloaded_idx += 1
-        except urllib.error.URLError as e:
-            print('something went wrong while downloading:\n',
-                  img_urls[index], e)
+    try:
+        download_path = imgs_path + \
+            str(index) + ext
+        print('Downloading:', final_img_links[index],
+              'at', download_path)
+        img = BytesIO(urllib.request.urlopen(final_img_links[index]).read())
+        process_img(img, download_path)
+    except urllib.error.URLError as e:
+        print('Something went wrong while downloading:\n',
+              final_img_links[index], e)
+        num_errs += 1
+
+print(f'{num_errs} images could not be downloaded, {n_imgs-n_errs} images successfully downloaded and processed.')
