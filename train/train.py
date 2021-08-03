@@ -102,9 +102,6 @@ def get_dataloader(batch_size, image_size, data_dir):
     :param data_dir: Directory where image data is located
     :return: DataLoader with batched data
     """
-
-    # TODO: Implement function and return a dataloader
-
     transform = transforms.Compose([transforms.Resize(image_size),
                                     transforms.ToTensor()])
 
@@ -360,6 +357,8 @@ if __name__ == '__main__':
     parser.add_argument('--num-gpus', type=int,
                         default=os.environ['SM_NUM_GPUS'])
 
+    parser.add_argument('output_path', metavar='output_path', type=str)
+
     args = parser.parse_args()
 
     device = torch.cuda.is_available()
@@ -387,5 +386,6 @@ if __name__ == '__main__':
 
     # Save the model parameters
     G_path = os.path.join(args.model_dir, 'generator_model_main.pt')
+    print('model_dir:', model_dir)
     with open(G_path, 'wb') as f:
         torch.save(G.cpu().state_dict(), f)
