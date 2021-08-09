@@ -1,3 +1,7 @@
+# Model from: https://arxiv.org/pdf/1511.06434.pdf
+# Generator architecture: https://www.researchgate.net/profile/Hamed-Alqahtani/publication/338050169/figure/fig10/AS:849390331756554@1579521844631/depicts-the-DCGAN-generator-for-LSUN-sample-scene-modeling-The-DCGAN-models-performance.ppm
+# Code based off https://github.com/bvshyam/facegeneration_gan_sagemaker/blob/master/train/model.py
+
 import argparse
 import json
 import os
@@ -31,11 +35,12 @@ def model_fn(model_dir):
     """Load the PyTorch model from the `model_dir` directory."""
     print("Loading model.")
 
-    # Determine the device and construct the model.
+    print("Model directory:", model_dir)
+
+    # Determine the device and construct the model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    #D = DataDiscriminator(64)
-    G = DataGenerator(z_size=100, conv_dim=64)
+    G = DataGenerator(z_size=100, conv_dim=64)  # TODO change to 128/64?
 
     model_info = {}
     model_info_path = os.path.join(model_dir, 'generator_model.pt')
@@ -53,30 +58,30 @@ def real_loss(D_out, train_on_gpu, smooth=False):
 
     batch_size = D_out.size(0)
 
-    # label smoothing
+    # Label smoothing
     if smooth:
-        # smooth, real labels = 0.9
+        # Smooth, real labels = 0.9
         labels = torch.ones(batch_size)*0.9
     else:
-        labels = torch.ones(batch_size)  # real labels = 1
-    # move labels to GPU if available
+        labels = torch.ones(batch_size)  # Real labels = 1
+    # Move labels to GPU if available
     if train_on_gpu:
         labels = labels.cuda()
-    # binary cross entropy with logits loss
+    # Binary cross entropy with logits loss
     criterion = nn.BCEWithLogitsLoss()
 
-    # calculate loss
+    # Calculate loss
     loss = criterion(D_out.squeeze(), labels)
     return loss
 
 
 def fake_loss(D_out, train_on_gpu):
     batch_size = D_out.size(0)
-    labels = torch.zeros(batch_size)  # fake labels = 0
+    labels = torch.zeros(batch_size)  # Fake labels = 0
     if train_on_gpu:
         labels = labels.cuda()
     criterion = nn.BCEWithLogitsLoss()
-    # calculate loss
+    # Calculate loss
     loss = criterion(D_out.squeeze(), labels)
     return loss
 
@@ -85,12 +90,10 @@ def scale(x, feature_range=(-1, 1)):
     ''' Scale takes in an image x and returns that image, scaled
        with a feature_range of pixel values from -1 to 1. 
        This function assumes that the input x is already scaled from 0-1.'''
-    # assume x is scaled to (0, 1)
-    # scale to feature_range and return scaled x
-
+    # Assume x is scaled to (0, 1)
+    # Scale to feature_range and return scaled x
     min, max = feature_range
     x = x * (max - min) + min
-
     return x
 
 
@@ -107,9 +110,6 @@ def get_dataloader(batch_size, image_size, data_dir):
 
     dataset = datasets.ImageFolder(data_dir, transform=transform)
 
-    #rand_sampler = torch.utils.data.RandomSampler(dataset, num_samples=32, replacement=True)
-    #dataloader = torch.utils.data.dataloader.DataLoader(dataset, batch_size=batch_size,shuffle=False, sampler=rand_sampler)
-
     dataloader = torch.utils.data.dataloader.DataLoader(
         dataset, batch_size=batch_size, shuffle=True)
 
@@ -123,8 +123,7 @@ def weights_init_normal(m):
     with mean = 0, std dev = 0.02.
     :param m: A module or layer in a network    
     """
-    # classname will be something like:
-    # `Conv`, `BatchNorm2d`, `Linear`, etc.
+
     classname = m.__class__.__name__
 
     if classname == 'Conv2d':
@@ -138,11 +137,11 @@ def weights_init_normal(m):
 
 
 def build_network(d_conv_dim, g_conv_dim, z_size):
-    # define discriminator and generator
+    # Define discriminator and generator
     D = DataDiscriminator(d_conv_dim)
     G = DataGenerator(z_size=z_size, conv_dim=g_conv_dim)
 
-    # initialize model weights
+    # Initialize model weights
     D.apply(weights_init_normal)
     G.apply(weights_init_normal)
 
@@ -157,20 +156,18 @@ def real_loss(D_out, train_on_gpu, smooth=False):
 
     batch_size = D_out.size(0)
 
-    # label smoothing
+    # Label smoothing
     if smooth:
-        # smooth, real labels = 0.9
+        # Smooth, real labels = 0.9
         labels = torch.ones(batch_size)*0.9
     else:
-        labels = torch.ones(batch_size)  # real labels = 1
-    # move labels to GPU if available
+        labels = torch.ones(batch_size)  # Real labels = 1
+    # Move labels to GPU if available
     if train_on_gpu:
         labels = labels.cuda()
-    # binary cross entropy with logits loss
+    # Binary cross entropy with logits loss
     criterion = nn.BCEWithLogitsLoss()
 
-    # print(D_out.squeeze().shape)
-    # print(labels.shape)
     # calculate loss
     loss = criterion(D_out.squeeze(), labels)
     return loss
@@ -188,19 +185,7 @@ def fake_loss(D_out, train_on_gpu):
 
 
 def train(D, G, z_size, train_loader, epochs, d_optimizer, g_optimizer, train_on_gpu):
-    """
-    This is the training method that is called by the PyTorch training script. The parameters
-    passed are as follows:
-    model        - The PyTorch model that we wish to train.
-    train_loader - The PyTorch DataLoader that should be used during training.
-    epochs       - The total number of epochs to train for.
-    optimizer    - The optimizer to use during training.
-    loss_fn      - The loss function used for training.
-    device       - Where the model and data should be loaded (gpu or cpu).
-    """
-
-    # Get some fixed data for sampling. These are images that are held
-    # constant throughout training, and allow us to inspect the model's performance
+    '''Training method called by PyTorch training script'''
 
     print_every = 50
     losses = []
@@ -209,12 +194,15 @@ def train(D, G, z_size, train_loader, epochs, d_optimizer, g_optimizer, train_on
         D.cuda()
         G.cuda()
 
+    # Fixed data for sampling, used in each epoch to generate images and can be compared across epochs
     samples = []
     sample_size = 16
     fixed_z = np.random.uniform(-1, 1, size=(sample_size, z_size))
     fixed_z = torch.from_numpy(fixed_z).float()
 
-    # train the network
+    print('Number epochs:', epochs)
+
+    # Training
     for epoch in range(epochs):
 
         for batch_i, (real_images, _) in enumerate(train_loader):
@@ -223,9 +211,7 @@ def train(D, G, z_size, train_loader, epochs, d_optimizer, g_optimizer, train_on
 
             real_images = scale(real_images)
 
-            # ============================================
-            #            TRAIN THE DISCRIMINATOR
-            # ============================================
+            # -------- TRAIN DISCRIMINATOR --------
 
             D.train()
             G.train()
@@ -247,7 +233,7 @@ def train(D, G, z_size, train_loader, epochs, d_optimizer, g_optimizer, train_on
             # Generate fake images
             z = np.random.uniform(-1, 1, size=(batch_size, z_size))
             z = torch.from_numpy(z).float()
-            # move x to GPU, if available
+            # Move x to GPU, if available
             if train_on_gpu:
                 z = z.cuda()
             fake_data = G(z)
@@ -256,14 +242,13 @@ def train(D, G, z_size, train_loader, epochs, d_optimizer, g_optimizer, train_on
             D_fake = D(fake_data)
             d_fake_loss = fake_loss(D_fake, train_on_gpu)
 
-            # add up loss and perform backprop
+            # Add up loss, backpropogation
             d_loss = d_real_loss + d_fake_loss
             d_loss.backward()
             d_optimizer.step()
 
-            # =========================================
-            #            TRAIN THE GENERATOR
-            # =========================================
+            # -------- TRAIN GENERATOR --------
+
             g_optimizer.zero_grad()
 
             # 1. Train with fake images and flipped labels
@@ -275,56 +260,56 @@ def train(D, G, z_size, train_loader, epochs, d_optimizer, g_optimizer, train_on
                 z = z.cuda()
             fake_images = G(z)
 
-            # Compute the discriminator losses on fake images
-            # using flipped labels!
+            # Compute discriminator losses on fake images (using flipped labels)
             D_fake = D(fake_images)
             # use real loss to flip labels
             g_loss = real_loss(D_fake, train_on_gpu)
 
-            # perform backprop
+            # Backpropogation
             g_loss.backward()
             g_optimizer.step()
 
-            # Print some loss stats
+            # Append/print generator/discriminator losses
             if batch_i % print_every == 0:
-                # append discriminator loss and generator loss
                 losses.append((d_loss.item(), g_loss.item()))
-                # print discriminator and generator loss
-                print('Epoch [{:5d}/{:5d}] | d_loss: {:6.4f} | g_loss: {:6.4f}'.format(
-                    epoch+1, epochs, d_loss.item(), g_loss.item()))
+                print('Epoch [{:5d}/{:5d}] | Batch [{:5d}/{:5d}] | d_loss: {:6.4f} | g_loss: {:6.4f}'.format(
+                    epoch+1, epochs, batch_i+1, len(train_loader), d_loss.item(), g_loss.item()))
 
-        ## AFTER EACH EPOCH##
-        # generate and save sample, fake images
-        G.eval()  # for generating samples
+        # Generate and save sample, fake images after each epoch
+        G.eval()
         if train_on_gpu:
             fixed_z = fixed_z.cuda()
 
         samples_z = G(fixed_z)
         samples.append(samples_z)
-        G.train()  # back to training mode
-
-    # _ = view_samples(-1, samples_z)
+        G.train()
 
     print(samples_z)
 
     with open('generator_model.pt', 'wb') as f:
         torch.save(G.state_dict(), f)
 
-    # Save training generator samples
+    print('Saved model at', f)
+
+    # Save final epoch training generator sample images
     with open('train_samples.pkl', 'wb') as f:
         pkl.dump(samples, f)
+
+    print('Saved sample generated images at', f)
 
     return G
 
 
 if __name__ == '__main__':
-    # All of the model parameters and training parameters are sent as arguments when the script
-    # is executed. Here we set up an argument parser to easily access the parameters.
+    # Model parameters and training parameters sent as arguments when script executed
+    # Argument parser to access parameters
+
+    # Mostly from https://arxiv.org/pdf/1511.06434.pdf !
 
     parser = argparse.ArgumentParser()
 
-    # Training Parameters
-    parser.add_argument('--batch-size', type=int, default=128, metavar='N',
+    # Training parameters
+    parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                         help='input batch size for training (default: 64)')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 10)')
@@ -333,7 +318,7 @@ if __name__ == '__main__':
     parser.add_argument('--z_size', type=int, default=100, metavar='N',
                         help='input z-size for training (default: 100)')
 
-    # Model Parameters
+    # Model parameters
     parser.add_argument('--conv_dim', type=int, default=64, metavar='N',
                         help='size of the convolution dim (default: 64)')
     parser.add_argument('--lr', type=float, default=0.0002, metavar='N',
@@ -342,10 +327,12 @@ if __name__ == '__main__':
                         help='beta1 default value 0.5')
     parser.add_argument('--beta2', type=float, default=0.999, metavar='N',
                         help='beta2 default value 0.999')
-    parser.add_argument('--img_size', type=int, default=32, metavar='N',
-                        help='Image size default value 32')
+    # parser.add_argument('--img_size', type=int, default=32, metavar='N',
+    #                     help='Image size default value 32')
+    parser.add_argument('--img_size', type=int, default=64, metavar='N',
+                        help='Image size default value 64')  # TODO orig 32
 
-    # SageMaker Parameters
+    # SageMaker parameters
     parser.add_argument('--hosts', type=list,
                         default=json.loads(os.environ['SM_HOSTS']))
     parser.add_argument('--current-host', type=str,
@@ -366,25 +353,23 @@ if __name__ == '__main__':
 
     torch.manual_seed(args.seed)
 
-    # Load the training data.
+    # Load training data
     train_loader = get_dataloader(
         args.batch_size, args.img_size, args.data_dir)
 
-    # Build the model.
+    # Build model
 
     D, G = build_network(args.conv_dim, args.conv_dim, z_size=args.z_size)
 
-    #D = DataDiscriminator(args.conv_dim)
-    #G = DataGenerator(z_size=args.z_size, conv_dim=args.conv_dim)
-
-    # Create optimizers for the discriminator and generator
+    # Create optimizers for discriminator and generator
     d_optimizer = optim.Adam(D.parameters(), args.lr, [args.beta1, args.beta2])
     g_optimizer = optim.Adam(G.parameters(), args.lr, [args.beta1, args.beta2])
 
+    # Train
     G = train(D, G, args.z_size, train_loader, args.epochs,
               d_optimizer, g_optimizer, device)
 
-    # Save the model parameters
+    # Save model parameters
     G_path = os.path.join(args.model_dir, 'generator_model_main.pt')
     print('model_dir:', model_dir)
     with open(G_path, 'wb') as f:
