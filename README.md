@@ -1,13 +1,24 @@
 # Deep convolutional generative adversarial network trained on sky images
 
-Unfiltered example training images:
-![](/assets/example-inputss.png)
+## Unfiltered example training images:
 
-Unfiltered example results:
+![](/assets/example-inputs.png)
+
+
+
+## Unfiltered example results:
+
 ![](/assets/example-outputs.png)
 
-Generator architecture: 
+
+
+## Approximate generator/discriminator architecture: 
+
 ![](https://www.researchgate.net/publication/331282441/figure/fig3/AS:729118295478273@1550846756282/Deep-convolutional-generative-adversarial-networks-DCGAN-for-generative-model-of-BF-NSP.png)
+
+
+
+## Info 
 
 - Architecture modified from [this 2016 paper](https://arxiv.org/pdf/1511.06434.pdf) introducing DCGANs
 - 16957 training images scraped from [r/SkyPorn](https://www.reddit.com/r/skyporn/) using Pushshift
